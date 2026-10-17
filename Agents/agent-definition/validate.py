@@ -59,7 +59,19 @@ def main(argv):
     valid_dir = os.path.join(HERE, "examples", "valid")
     invalid_dir = os.path.join(HERE, "examples", "invalid")
 
-    for path in sorted(glob.glob(os.path.join(valid_dir, "*.json"))):
+    valid_files = sorted(glob.glob(os.path.join(valid_dir, "*.agent.json")))
+    invalid_files = sorted(glob.glob(os.path.join(invalid_dir, "*.agent.json")))
+
+    if not valid_files and not invalid_files:
+        print(
+            "FAIL: found zero example files under "
+            f"{os.path.relpath(valid_dir, HERE)} and "
+            f"{os.path.relpath(invalid_dir, HERE)}. A moved or emptied "
+            "examples directory must not make this check pass trivially."
+        )
+        return 1
+
+    for path in valid_files:
         errors = validate_file(validator, path)
         ok = len(errors) == 0
         print(f"{'PASS' if ok else 'FAIL'} (expected valid)   {os.path.relpath(path, HERE)}")
@@ -68,7 +80,7 @@ def main(argv):
             for e in errors:
                 print(f"  - {'/'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}")
 
-    for path in sorted(glob.glob(os.path.join(invalid_dir, "*.json"))):
+    for path in invalid_files:
         errors = validate_file(validator, path)
         ok = len(errors) > 0
         print(f"{'PASS' if ok else 'FAIL'} (expected invalid) {os.path.relpath(path, HERE)}")

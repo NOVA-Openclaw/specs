@@ -87,7 +87,7 @@ combination, subject to two inclusive validity rules:
    *either-or-neither* rule: in JSON Schema terms it is an `anyOf` of two
    `required` clauses, **not** a `oneOf`. A definition carrying both a name
    and a role is valid; a schema that uses `oneOf` here would wrongly reject
-   it (see [`examples/valid/named-agent-with-identity.json`](examples/valid/named-agent-with-identity.json),
+   it (see [`examples/valid/named-agent-with-identity.agent.json`](examples/valid/named-agent-with-identity.agent.json),
    which exists specifically to catch that mistake).
 2. **At least one substantive field MUST be present**: `bootstrap`,
    `identity`, `skills`, `tools`, or `model`. A document with only
@@ -117,7 +117,34 @@ Top-level fields:
 | [`permissions`](#permissions) | object | OPTIONAL |
 | [`contract`](#contract) | object | OPTIONAL |
 | [`integrity`](#integrity) | object | OPTIONAL |
-| `x-*` | any | OPTIONAL, vendor extension (see [Extensibility](#extensibility)) |
+| [`extensions`](#extensions) | object | OPTIONAL, free-form (see [Extensibility](#extensibility)) |
+
+## Example (informative)
+
+The canonical examples are the `.agent.json` files under
+[`examples/`](examples/); this section shows one in full as a
+verbatim excerpt for readability. If this excerpt and the file on disk
+ever disagree, the file is authoritative.
+
+Excerpt of [`examples/valid/role-only-focus-agent.agent.json`](examples/valid/role-only-focus-agent.agent.json),
+a minimal role-only, identity-less definition:
+
+```json
+{
+  "spec_version": "0.1.0",
+  "metadata": {
+    "role": "Research"
+  },
+  "bootstrap": "You are a research-focus agent within a larger agent swarm. Your job is to find, verify, and summarize information relevant to the task you are given. Cite sources. When a claim cannot be verified from at least one primary source, label it as unverified rather than presenting it as fact. Keep summaries under 500 words unless the requester asks for more detail."
+}
+```
+
+See [`examples/valid/`](examples/valid/) and
+[`examples/invalid/`](examples/invalid/) for the full set, including a
+definition with both `name` and `role`, a tools/skills-only definition, a
+definition carrying `extensions`, and a full example combining model
+preferences, tool references (including an MCP server), permissions, an I/O
+contract, and an integrity hash.
 
 ## Field Definitions
 
@@ -247,7 +274,7 @@ and/or URL, never inlines its content. Each entry:
 | `name` | string | OPTIONAL | A human-readable label for this reference. |
 
 A skill reference with neither `id` nor `url` is invalid: see
-[`examples/invalid/skill-missing-locator.json`](examples/invalid/skill-missing-locator.json).
+[`examples/invalid/skill-missing-locator.agent.json`](examples/invalid/skill-missing-locator.agent.json).
 
 ### `tools`
 
@@ -328,11 +355,15 @@ This top-level `integrity` block covers the agent definition document
 itself. Skill and tool references carry their own, separate `integrity`
 sub-fields covering the referenced artifact.
 
-### `x-*` (vendor extensions)
+### `extensions`
 
-Any top-level or nested property name matching `^x-` is reserved for vendor
-or implementation-specific extensions and is never defined by this
-specification. See [Extensibility](#extensibility).
+Type: object. OPTIONAL. MAY appear at the top level, and MAY also appear
+inside `metadata`, `identity`, each `model` list entry, each `skills` or
+`tools` entry, `permissions`, and `contract`.
+
+A free-form object for vendor- or implementation-specific data that this
+specification does not define and does not need to be updated to
+accommodate. See [Extensibility](#extensibility) for the full rules.
 
 ## Processing Rules for Harnesses
 
@@ -396,12 +427,22 @@ A harness that has its own host identity (an identity it supplies
 independently of any agent definition — see [Terminology](#terminology))
 MUST follow a **declared identity policy** when a definition also carries an
 `identity` block. This specification defines three policy values a harness
-MAY declare for itself: `use_definition` (the definition's `identity`
-replaces the host identity entirely), `use_host` (the host identity is kept
-and the definition's `identity` is ignored), and `merge` (both are
-presented, host identity first, harness-defined order otherwise). A harness
-MUST declare which policy it implements (in its own documentation or
-conformance notes) and **MUST report, per instantiation, which of the
+MAY declare for itself, matching the "uses, replaces, or ignores" language
+in this spec's originating design discussion:
+
+- `use` — the harness uses the definition's `identity`: it is composed
+  identity-first as described above, and the harness's own host identity is
+  not applied for this instantiation.
+- `replace` — the harness's own host identity replaces the definition's
+  `identity`: the host identity is presented instead, and the definition's
+  `identity` content is not presented to the agent at all.
+- `ignore` — the harness ignores the definition's `identity` and does
+  **not** substitute its own host identity in its place either: the agent is
+  instantiated from `bootstrap` (and any other non-identity fields) alone,
+  with no identity content from either source.
+
+A harness MUST declare which policy it implements (in its own documentation
+or conformance notes) and **MUST report, per instantiation, which of the
 declared behaviors it actually applied** when a definition's `identity` was
 present and the harness has a host identity of its own. This specification
 does not mandate any one policy; it mandates that one is declared and its
@@ -426,17 +467,79 @@ is not enforcing.
 
 ## Extensibility
 
-Vendor- or implementation-specific fields SHOULD be prefixed with `x-` at
-whatever level of the document they appear (top level or nested within a
-block), following the precedent set by
-[CloudEvents](https://github.com/cloudevents/spec) and similar specs. A
-conforming harness or validator **MUST ignore unknown fields** — whether or
-not they are `x-`-prefixed — rather than rejecting the document because of
-them. This specification may define new, non-`x-` top-level or nested fields
-in future minor versions; a harness built against an older minor version
-MUST continue to ignore fields it does not recognize rather than fail
-validation, which is why `additionalProperties` is not set to `false`
-anywhere in the normative schema.
+This specification provides exactly **one** spec-defined extension point: an
+optional `extensions` object.
+
+`extensions` MAY appear at the top level of a definition, and the same,
+independent `extensions` object MAY also appear inside `metadata`,
+`identity`, each `model` list entry, each `skills` or `tools` entry,
+`permissions`, and `contract` — so vendor- or implementation-specific data
+sits next to the block it extends, rather than only at the document root.
+Each `extensions` object is free-form: its value MAY be any JSON.
+
+**Namespacing.** Keys within an `extensions` object SHOULD be namespaced to
+avoid collisions between unrelated vendors or tools — for example a
+reverse-DNS string or a short vendor prefix, such as
+`"org.example.harness": { ... }`. This specification does not enforce a
+namespace syntax; it is a SHOULD, not a MUST, matching the convention used by
+[MCP's `_meta`](https://modelcontextprotocol.io/specification/2026-07-28/basic)
+(see Prior art below) rather than Kubernetes' stricter `prefix/name` syntax.
+
+**Harness rules.** A conforming harness:
+
+- **MUST NOT refuse to instantiate** a definition because of unrecognized
+  `extensions` content.
+- **MAY drop** any `extensions` namespace it does not understand when
+  importing a definition. It is not required to retain data it cannot
+  interpret.
+- **SHOULD preserve** a namespace it understands when it re-exports or
+  transforms a definition. Preserving a namespace it does **not** understand
+  on re-export is **OPTIONAL** (MAY) — a harness is free to drop unknown
+  extension data rather than carry it through unexamined, but losing data it
+  does understand without a reason defeats the point of declaring it.
+- **MUST NOT** let `extensions` override the meaning of any spec-defined
+  field. `extensions` is additive, side-channel data; it is never an
+  alternate way to satisfy a spec-defined field's requirements.
+
+**Unknown top-level fields outside `extensions`.** This specification may
+define new, additional top-level or nested fields in future minor versions
+(see [Versioning](#versioning)). A harness built against an older minor
+version MUST continue to ignore fields it does not recognize rather than
+fail validation, which is why `additionalProperties` is not set to `false`
+anywhere in the normative schema. However, this tolerance exists for
+**forward compatibility with later versions of this spec**, not as a general
+invitation to invent fields: producers conforming to this version of the
+spec MUST NOT invent new top-level or nested fields of their own and SHOULD
+place vendor- or implementation-specific data in `extensions` instead, where
+a harness's conformance obligations (never refuse to instantiate because of
+them, and preserve a namespace it understands when re-exporting) are
+explicit and spec-guaranteed.
+
+**Prior art.** The single spec-defined, namespaced-key extension object
+follows the shape of (each verified against its source before citing here):
+
+- **[Model Context Protocol `_meta`](https://modelcontextprotocol.io/specification/2026-07-28/basic)**
+  — an object of string keys to arbitrary JSON values carried on requests,
+  results, and notifications, with reverse-DNS-style namespaced key prefixes
+  and reserved prefixes for the protocol itself. This specification's
+  `extensions` is closest in spirit to `_meta`: one object, namespaced keys,
+  freeform values.
+- **[Kubernetes `metadata.annotations`](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)**
+  — an unstructured key/value map attached to an object for tools and
+  libraries to read and write, explicitly not used for identification or
+  selection (that is what labels are for). Kubernetes annotation values are
+  strings; this specification's `extensions` values MAY be any JSON, closer
+  to `_meta` than to annotations in that respect.
+- **[CloudEvents extension context attributes](https://github.com/cloudevents/spec/blob/main/cloudevents/extensions/README.md)**
+  — additional named attributes alongside CloudEvents' core context
+  attributes, with no meaning defined by the core spec; this specification's
+  rule that harnesses MUST ignore namespaces they do not understand mirrors
+  CloudEvents' treatment of extension attributes as optional, independently
+  defined metadata.
+
+See [`examples/valid/with-extensions.agent.json`](examples/valid/with-extensions.agent.json)
+for a definition carrying `extensions` at the top level and inside a
+`tools` entry.
 
 ## Versioning
 
@@ -592,7 +695,7 @@ either is skipped rather than erroring.
 | `contract` | *(no equivalent)* | Claude Code has no declared I/O JSON Schema contract for a subagent. |
 | `integrity` | *(no equivalent)* | Not applicable; Claude Code subagent files are local, version-controlled Markdown, not fetched-by-reference artifacts. |
 | *(no equivalent)* | `skills` (preload list) | Claude Code's `skills` frontmatter field *preloads* named skill content into context at startup; this is closer to inlining than to this spec's by-reference `skills`, and has no faithful round-trip without resolving each preloaded skill name to a published, referenceable skill. |
-| *(no equivalent)* | `maxTurns`, `autoCompactWindow`, `background`, `omitClaudeMd`, `isolation`, `color`, `initialPrompt`, `experimental.cacheTtl`, `effort`, `disallowedTools`, `hooks`, `memory` | Harness-specific runtime controls with no corresponding concept in this spec; these are expected to stay harness-local extensions (an exporter MAY carry them as `x-claude-code-*` fields) rather than becoming part of a platform-agnostic definition. |
+| *(no equivalent)* | `maxTurns`, `autoCompactWindow`, `background`, `omitClaudeMd`, `isolation`, `color`, `initialPrompt`, `experimental.cacheTtl`, `effort`, `disallowedTools`, `hooks`, `memory` | Harness-specific runtime controls with no corresponding concept in this spec; these are expected to stay harness-local; an exporter MAY carry them inside `extensions` (e.g. `extensions["com.anthropic.claude-code"]`) rather than inventing new top-level fields. |
 
 **Could not verify:** whether Claude Code's frontmatter parser ignores
 arbitrary unrecognized field names in general (as opposed to the two
@@ -659,6 +762,9 @@ asserting a field-level mapping for those two files.
 - [RFC 8785 — JSON Canonicalization Scheme (JCS)](https://www.rfc-editor.org/rfc/rfc8785)
 - [JSON Schema, draft 2020-12](https://json-schema.org/draft/2020-12/release-notes)
 - [Semantic Versioning 2.0.0](https://semver.org/)
-- [CloudEvents Specification](https://github.com/cloudevents/spec) (house style precedent for `x-` extension fields and this document's structure)
+- [CloudEvents Specification](https://github.com/cloudevents/spec) (house style precedent for this document's structure)
+- [Model Context Protocol — Base Protocol (`_meta`)](https://modelcontextprotocol.io/specification/2026-07-28/basic)
+- [Kubernetes — Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+- [CloudEvents — Extension Context Attributes](https://github.com/cloudevents/spec/blob/main/cloudevents/extensions/README.md)
 - [Claude Code — Create custom subagents](https://code.claude.com/docs/en/sub-agents)
 - [Hermes Agent — Profile Distributions: Share a Whole Agent](https://hermes-agent.nousresearch.com/docs/user-guide/profile-distributions)

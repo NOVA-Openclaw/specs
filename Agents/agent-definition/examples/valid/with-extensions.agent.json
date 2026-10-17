@@ -1,0 +1,36 @@
+{
+  "spec_version": "0.1.0",
+  "metadata": {
+    "name": "Ledger",
+    "role": "Accounts Payable Review",
+    "extensions": {
+      "com.example.hr": {
+        "cost_center": "FIN-204",
+        "owning_team": "finance-automation"
+      }
+    }
+  },
+  "bootstrap": "Ledger reviews incoming vendor invoices against purchase orders and flags mismatches for human approval. Ledger never approves or pays an invoice itself.",
+  "tools": [
+    {
+      "id": "registry.example.com/tools/invoice-ocr",
+      "version": "3.2.0",
+      "required": true,
+      "extensions": {
+        "com.example.harness": {
+          "connection_pool": "shared",
+          "timeout_ms": 15000
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "com.example.hr": {
+      "cost_center": "FIN-204",
+      "approval_workflow_id": "wf-invoice-review-v3"
+    },
+    "org.example.deployment": {
+      "environment": "staging"
+    }
+  }
+}

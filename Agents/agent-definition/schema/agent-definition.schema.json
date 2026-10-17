@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/NOVA-Openclaw/specs/Agents/agent-definition/schema/agent-definition.schema.json",
   "title": "Agent Definition",
-  "description": "A platform-agnostic, harness-agnostic JSON document from which an agent harness can configure a functional subagent. See Agents/agent-definition/README.md for the normative prose specification.",
+  "description": "A platform-agnostic, harness-agnostic JSON document from which an agent harness can configure a functional subagent. See Agents/agent-definition/README.md for the normative prose specification. Vendor- or implementation-specific data belongs in the spec-defined `extensions` object, not in invented top-level fields.",
   "type": "object",
   "required": [
     "spec_version"
@@ -56,10 +56,10 @@
     },
     "integrity": {
       "$ref": "#/$defs/integrity"
+    },
+    "extensions": {
+      "$ref": "#/$defs/extensions"
     }
-  },
-  "patternProperties": {
-    "^x-[A-Za-z0-9-]*$": true
   },
   "additionalProperties": true,
   "allOf": [
@@ -171,6 +171,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
         }
       },
       "additionalProperties": true
@@ -203,6 +206,9 @@
         },
         "notes": {
           "type": "string"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
         }
       },
       "additionalProperties": true
@@ -231,6 +237,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
         }
       },
       "additionalProperties": true
@@ -271,6 +280,9 @@
         },
         "integrity": {
           "$ref": "#/$defs/integrity"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
         }
       }
     },
@@ -366,6 +378,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
         }
       },
       "additionalProperties": true
@@ -393,6 +408,9 @@
         "output": {
           "description": "A JSON Schema describing the agent's produced output.",
           "type": "object"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
         }
       },
       "additionalProperties": true
@@ -422,6 +440,10 @@
         }
       },
       "additionalProperties": true
+    },
+    "extensions": {
+      "type": "object",
+      "description": "A free-form, spec-defined extension point for vendor- or implementation-specific data that does not require a spec update. Keys SHOULD be namespaced (reverse-DNS or a short vendor prefix, e.g. \"org.example.harness\") to avoid collisions. Values MAY be any JSON. A harness MUST ignore namespaces it does not understand and MUST NOT refuse to instantiate because of unknown extension content. A harness SHOULD preserve this object unchanged when it re-exports or transforms a definition. Extensions MUST NOT override the meaning of any spec-defined field."
     }
   }
 }
