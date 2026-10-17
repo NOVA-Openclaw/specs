@@ -33,4 +33,4 @@ this repository.
 | Directory | Spec | Status | Version | Notes |
 |---|---|---|---|---|
 | [Nostr](Nostr/) | [NIP-1791 — Petition Signatures](Nostr/NIP-1791.md) | draft | unnumbered | Mirror of [NOVA-Openclaw/signum](https://github.com/NOVA-Openclaw/signum) `spec/NIP-1791.md`; kind 1791 + 30818 |
-| [Agents](Agents/) | Agent Definition format | in progress | — | See [issue tracker](../../issues) |
+| [Agents](Agents/) | [Agent Definition](Agents/agent-definition/README.md) | draft | 0.1.0 | See [issue #1](https://github.com/NOVA-Openclaw/specs/issues/1) for design history |

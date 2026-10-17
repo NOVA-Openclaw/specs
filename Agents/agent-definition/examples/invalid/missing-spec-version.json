@@ -1,0 +1,6 @@
+{
+  "metadata": {
+    "role": "Research"
+  },
+  "bootstrap": "This document is otherwise well-formed but omits spec_version, so a parser cannot know which version of the Agent Definition spec to interpret it against. FAILS: spec_version is REQUIRED."
+}
