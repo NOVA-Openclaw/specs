@@ -873,8 +873,7 @@ Claude Code ignores the field silently with no debug-log trace at all.
 | `model[].settings` | `effort` | Claude Code's `effort` (a reasoning-effort-like dial) belongs in the relevant model entry's `settings` object on export, the same place this spec puts any other provider- or model-specific reasoning parameter (see [`model`](#model)), rather than in `extensions`. |
 | `limits.max_turns` | `maxTurns` | Direct mapping: both cap the number of turns the agent may take. |
 | `execution.background` | `background` | Direct mapping. |
-| `execution.isolation` | `isolation` | Partial mapping. Claude Code's documented value is `worktree` (a git-worktree-based isolation mechanism), which is not one of this spec's recommended `execution.isolation` vocabulary (`none`/`process`/`container`/`vm`) and has no cross-harness equivalent. Exporting *to* this spec, carry the Claude-Code-specific mechanism as `extensions["com.anthropic.claude-code"].isolation = "worktree"` rather than overloading `execution.isolation` with a value no other harness can act on; a generic `execution.isolation` value MAY still be set alongside it (e.g. `"process"`) as a best-effort cross-harness hint. |
-| `tools` (by reference) | `tools` (allowlist) | **Not a direct mapping.** Claude Code's `tools` names *built-in or MCP tool identifiers already available to the session*; it is a filter, not a by-reference installable tool list. This spec's `tools` are externally published, versioned, integrity-checkable references. Converting in either direction requires a resolution step this spec does not define: from Claude Code, each allowed tool name would need an external registry entry to become a reference; from this spec, each tool reference would need to resolve to a Claude Code tool name before it can appear in `tools`. || `tools[].kind: "mcp_server"` | `mcpServers` | Claude Code's `mcpServers` can reference an already-configured server by name or supply an inline connection config; this spec's MCP tool references always use a locator (`id`/`url`), never an inline config, so an inline `mcpServers` entry has no direct equivalent without first publishing it somewhere resolvable. |
+| `execution.isolation` | `isolation` | Partial mapping. Claude Code's documented value is `worktree` (a git-worktree-based isolation mechanism), which is not one of this spec's recommended `execution.isolation` vocabulary (`none`/`process`/`container`/`vm`) and has no cross-harness equivalent. Exporting *to* this spec, carry the Claude-Code-specific mechanism as `extensions["com.anthropic.claude-code"].isolation = "worktree"` rather than overloading `execution.isolation` with a value no other harness can act on; a generic `execution.isolation` value MAY still be set alongside it (e.g. `"process"`) as a best-effort cross-harness hint. || `tools` (by reference) | `tools` (allowlist) | **Not a direct mapping.** Claude Code's `tools` names *built-in or MCP tool identifiers already available to the session*; it is a filter, not a by-reference installable tool list. This spec's `tools` are externally published, versioned, integrity-checkable references. Converting in either direction requires a resolution step this spec does not define: from Claude Code, each allowed tool name would need an external registry entry to become a reference; from this spec, each tool reference would need to resolve to a Claude Code tool name before it can appear in `tools`. || `tools[].kind: "mcp_server"` | `mcpServers` | Claude Code's `mcpServers` can reference an already-configured server by name or supply an inline connection config; this spec's MCP tool references always use a locator (`id`/`url`), never an inline config, so an inline `mcpServers` entry has no direct equivalent without first publishing it somewhere resolvable. |
 | `permissions` | *(no direct equivalent)* | Claude Code's `permissionMode` (see below) selects an approval-flow *mode*, not filesystem/network/side-effect scopes; it goes to `extensions`, not `permissions`. |
 | `contract` | *(no equivalent)* | Claude Code has no declared I/O JSON Schema contract for a subagent. |
 | `integrity` | *(no equivalent)* | Not applicable; Claude Code subagent files are local, version-controlled Markdown, not fetched-by-reference artifacts. |
@@ -941,12 +940,14 @@ git tags/branches/commit SHAs, not a manifest version-range field.
 <https://agent-plugins.org/schemas/1.0.0/>) is a packaging and distribution
 format for skills and MCP servers; Hermes implements it (see [Appendix
 B](#appendix-b-mapping-tofrom-hermes-agent-profile-distributions-informative)).
-An Agent Plugins package's manifest, `plugin.json`, has exactly nine
-properties: `$schema`, `name`, `version`, `description`, `author`,
-`homepage`, `repository`, `license`, `keywords`, and `extensions`. There
-is no `model`, `prompt`, or `permissions` field — Agent Plugins defines no
-agent. A package instead bundles the things an agent might *use*: skills
-(`skills/<name>/SKILL.md`) and MCP servers (`mcp.json`).
+Agent Plugins `1.0.0`'s `plugin.json` manifest
+(schema: <https://agent-plugins.org/schemas/1.0.0/plugin.schema.json>)
+defines only these properties: `$schema`, `name`, `version`,
+`description`, `author`, `homepage`, `repository`, `license`, `keywords`,
+and `extensions`. There is no `model`, `prompt`, or `permissions` field —
+Agent Plugins defines no agent. A package instead bundles the things an
+agent might *use*: skills (`skills/<name>/SKILL.md`) and MCP servers
+(`mcp.json`).
 
 **This makes Agent Plugins and this specification complementary layers, not
 competing ones.** Agent Plugins packages and distributes components; an
