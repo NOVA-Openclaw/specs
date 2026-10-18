@@ -117,6 +117,12 @@ Top-level fields:
 | [`permissions`](#permissions) | object | OPTIONAL |
 | [`contract`](#contract) | object | OPTIONAL |
 | [`integrity`](#integrity) | object | OPTIONAL |
+| [`limits`](#limits) | object | OPTIONAL |
+| [`environment`](#environment) | array | OPTIONAL |
+| [`initial_prompt`](#initial_prompt) | string | OPTIONAL |
+| [`execution`](#execution) | object | OPTIONAL |
+| [`schedules`](#schedules) | array | OPTIONAL |
+| [`delegation`](#delegation) | object | OPTIONAL |
 | [`extensions`](#extensions) | object | OPTIONAL, free-form (see [Extensibility](#extensibility)) |
 
 ## Example (informative)
@@ -355,6 +361,99 @@ This top-level `integrity` block covers the agent definition document
 itself. Skill and tool references carry their own, separate `integrity`
 sub-fields covering the referenced artifact.
 
+### `limits`
+
+Type: object, at least one property. OPTIONAL.
+
+| Sub-field | Type | Requirement | Semantics |
+|---|---|---|---|
+| `max_turns` | integer, >= 1 | at least one of `max_turns`/`timeout_seconds` REQUIRED | The maximum number of conversational turns the agent may take before the harness stops it. |
+| `timeout_seconds` | integer, >= 1 | at least one of `max_turns`/`timeout_seconds` REQUIRED | The maximum wall-clock time, in seconds, the agent may run before the harness stops it. |
+
+A harness that cannot honor a declared limit MUST report that it could not;
+see [Limits, execution, and schedule reporting](#limits-execution-and-schedule-reporting).
+
+### `environment`
+
+Type: array of objects, 1 or more entries. OPTIONAL.
+
+A list of environment variables the agent needs the harness to resolve (for
+example, API keys or endpoint URLs the agent's tools depend on). Each entry:
+
+| Sub-field | Type | Requirement | Semantics |
+|---|---|---|---|
+| `name` | string | REQUIRED | The environment variable's name. |
+| `description` | string | OPTIONAL | A human-readable description of what this variable is for. |
+| `required` | boolean | OPTIONAL, defaults to `true` | Whether the harness MUST be able to resolve this variable for the agent to be instantiated. |
+| `secret` | boolean | OPTIONAL, defaults to `false` | Whether this variable's value should be treated as a secret (e.g. masked in logs). |
+
+**An `environment` entry declares a variable's NAME and requirements only.
+It MUST NOT carry the variable's actual value** — the normative schema
+structurally forbids a `value` property on an environment entry. A
+definition is a portable description of an agent, not a credential bundle;
+resolving named variables to actual values is the harness's job, from
+whatever secret store or environment it has available. See [Environment
+resolution](#environment-resolution).
+
+### `initial_prompt`
+
+Type: string. OPTIONAL.
+
+A single text blob auto-submitted to the agent as its first user turn, as
+distinct from `bootstrap`, which configures the agent but is not itself a
+turn in the conversation. `bootstrap` stays a single, structureless blob
+regardless of whether `initial_prompt` is present.
+
+Because `initial_prompt` is natural-language text submitted into the
+agent's conversation, it is untrusted input with respect to prompt
+injection, exactly like `bootstrap` and `identity`; see [Security
+Considerations](#security-considerations).
+
+### `execution`
+
+Type: object, at least one property. OPTIONAL.
+
+| Sub-field | Type | Requirement | Semantics |
+|---|---|---|---|
+| `background` | boolean | at least one of `background`/`isolation` REQUIRED | Whether the agent is intended to run as a background task rather than an interactive, foreground session. |
+| `isolation` | string | at least one of `background`/`isolation` REQUIRED | The isolation level the agent expects to run under. Recommended values: `"none"`, `"process"`, `"container"`, `"vm"`. |
+
+`isolation` is an **open vocabulary, not a closed enum**: this specification
+recommends the four values above for cross-harness consistency, but a
+harness MAY encounter a value it does not recognize (a harness-specific
+isolation mechanism, for example) and MUST report it rather than rejecting
+the definition because of it. See [Limits, execution, and schedule
+reporting](#limits-execution-and-schedule-reporting).
+
+### `schedules`
+
+Type: array of objects, 1 or more entries. OPTIONAL.
+
+A list of recurring schedules on which the agent should run a prompt
+autonomously, with no human initiating each run. Each entry:
+
+| Sub-field | Type | Requirement | Semantics |
+|---|---|---|---|
+| `id` | string | REQUIRED | A stable identifier for this schedule entry, unique within the definition. |
+| `cron` | string | REQUIRED | A cron expression describing when this schedule fires. |
+| `prompt` | string | REQUIRED | The prompt to submit to the agent when this schedule fires. |
+| `enabled` | boolean | OPTIONAL | Whether this schedule is enabled. |
+| `timezone` | string | OPTIONAL | The IANA time zone name the cron expression is evaluated in (e.g. `"UTC"`, `"America/New_York"`). |
+
+Because a schedule causes the agent to run autonomously and repeatedly, a
+harness SHOULD require explicit operator approval before enabling a
+schedule imported from a definition, rather than honoring `enabled: true`
+unconditionally; see [Security Considerations](#security-considerations).
+
+### `delegation`
+
+Type: object, at least one property. OPTIONAL.
+
+| Sub-field | Type | Requirement | Semantics |
+|---|---|---|---|
+| `when_to_use` | string | at least one of `when_to_use`/`may_delegate_to` REQUIRED | Guidance for an orchestrator deciding whether to delegate to this agent. Distinct from `metadata.description`, which is a general description rather than delegation-routing guidance. |
+| `may_delegate_to` | array\<string\> | at least one of `when_to_use`/`may_delegate_to` REQUIRED | Names or roles of agents this agent may itself delegate to. |
+
 ### `extensions`
 
 Type: object. OPTIONAL. MAY appear at the top level, and MAY also appear
@@ -452,6 +551,37 @@ When `metadata.name` is absent, the harness MUST derive a fallback handle
 from `metadata.role` (e.g. `role: "Research"` to `focus-research`, exact
 derivation scheme left to the harness) and MUST report the derived handle
 wherever it reports instantiation diagnostics.
+
+### Limits, execution, and schedule reporting
+
+A harness that cannot honor a declared `limits` value (`max_turns`,
+`timeout_seconds`), a declared `execution.isolation` level, a declared
+`execution.background` request, or a declared `schedules` entry MUST
+report that it could not, wherever it reports instantiation diagnostics.
+This mirrors [Permission enforcement and reporting](#permission-enforcement-and-reporting):
+enforce what the runtime is capable of, and be honest about what it is not.
+This specification does not require a harness to be capable of running
+agents in the background, under a given isolation level, or on a schedule
+at all; it requires that gap to be visible rather than silent.
+
+### Environment resolution
+
+For each `environment` entry, the harness MUST attempt to resolve the named
+variable from whatever environment or secret store it has available. If
+resolution fails:
+
+- `required` absent or `true` (the default) — the harness **MUST refuse to
+  instantiate** the agent, the same refusal this specification requires for
+  an unsatisfiable `required: true` tool reference (see [Tool and skill
+  resolution and refusal](#tool-and-skill-resolution-and-refusal)).
+- `required: false` — the harness MAY instantiate the agent without the
+  variable resolved, but MUST report the omission.
+
+Separately, and regardless of resolution outcome: a harness MUST NOT accept,
+and a definition MUST NOT carry, an actual value for an `environment` entry
+(enforced structurally in the normative schema). An agent definition
+declares what it needs; it is never the place actual secrets or
+configuration values live.
 
 ### Permission enforcement and reporting
 
@@ -623,6 +753,22 @@ gap creates a false sense of containment. Implementers MUST treat
 unenforceable-and-unreported permission gaps as a security defect in their
 harness, not an acceptable shortcut.
 
+**Initial prompt is untrusted, by design.** `initial_prompt`, like
+`bootstrap` and `identity`, is natural-language content submitted into the
+agent's conversation, and carries the same prompt-injection risk described
+above for `bootstrap`. A harness SHOULD apply the same scrutiny to
+`initial_prompt` that it applies to `bootstrap`.
+
+**Schedules run prompts autonomously.** A `schedules` entry causes the
+harness to submit `prompt` to the agent repeatedly, on a cron schedule,
+with no human initiating any individual run. This is a materially larger
+blast radius than a single interactive session: a malicious or compromised
+`schedules` entry runs unattended, indefinitely, until disabled. A harness
+**SHOULD require explicit operator approval before enabling a schedule
+imported from a definition** — `enabled: true` in an imported definition is
+a request, not an instruction the harness is obligated to honor
+automatically.
+
 **Identity spoofing.** Because `identity` is free text, a definition can
 claim any name, persona, or voice, including one that impersonates a
 specific person, organization, or another known agent. This specification
@@ -671,8 +817,8 @@ reports that gap per point 5 above rather than silently ignoring it.
 Claude Code subagents are Markdown files with YAML frontmatter under
 `.claude/agents/` (project/user/managed scopes) or shipped by a plugin; the
 frontmatter configures the subagent, and the Markdown body becomes its system
-prompt. Source, verified by direct fetch on 2026-10-17:
-<https://code.claude.com/docs/en/sub-agents>.
+prompt. Source, verified by direct fetch on 2026-10-17 and re-verified
+2026-10-18: <https://code.claude.com/docs/en/sub-agents>.
 
 Verified frontmatter fields (per that page): `name`, `description`,
 `tools`, `disallowedTools`, `model`, `permissionMode`, `mcpServers`,
@@ -681,31 +827,40 @@ Verified frontmatter fields (per that page): `name`, `description`,
 `experimental`. Only `name` and `description` are required; a file missing
 either is skipped rather than erroring.
 
+**VERIFIED: unrecognized-field handling.** The documentation states, quoted
+verbatim: "Multi-word field names use camelCase, such as `maxTurns` and
+`disallowedTools`, and must match the table exactly: **Claude Code ignores
+a field it doesn't recognize without reporting an error.**" It further
+states: "To find a misspelled field in a subagent that loaded, run
+`claude --debug` in your shell and search the debug log at
+`~/.claude/debug/<session-id>.txt` for `does not recognize or apply`. The
+debug log names up to five top-level fields in the subagent's file that
+Claude Code doesn't recognize, with the likely intended name when a
+supported field is close. **Requires Claude Code v2.1.296 or later.**" This
+confirms, for Claude Code specifically, the same "ignore unknown fields,
+don't reject" posture this spec requires of every conforming harness (see
+[Extensibility](#extensibility)) — with the caveat that below v2.1.296,
+Claude Code ignores the field silently with no debug-log trace at all.
+
 | Agent Definition | Claude Code frontmatter | Notes |
 |---|---|---|
 | `metadata.name` | `name` | Both are the invocation/display name. |
-| `metadata.description` | `description` | Claude Code's `description` additionally drives automatic delegation (Claude decides when to invoke the subagent from this text); this spec's `description` is purely descriptive. **Lossy on export to Claude Code** if a definition has no `description` — Claude Code requires one. |
+| `metadata.description` and/or `delegation.when_to_use` | `description` | Claude Code's `description` drives automatic delegation (Claude decides when to invoke the subagent from this text), which is what this spec's `delegation.when_to_use` is for; it is also the human-readable description, which is what `metadata.description` is for. Claude Code conflates the two into one field. Exporting *to* Claude Code, this spec's `delegation.when_to_use` is the better source if both are present, since that is the field Claude Code's own routing behavior most resembles. **Lossy on export to Claude Code** if a definition has neither — Claude Code requires `description`. |
 | `bootstrap` | Markdown body (system prompt) | Direct mapping: the body *is* the bootstrap text, with no internal structure imposed, matching this spec's "opaque blob" rule. |
+| `initial_prompt` | `initialPrompt` | Direct mapping: both are auto-submitted as the first user turn when the agent runs as the main session agent, and both are distinct from the system-prompt-equivalent field (`bootstrap`/Markdown body). |
 | `identity` | *(no dedicated field)* | Claude Code has no separate identity/persona field; a Claude Code subagent's "who it is" lives in the same Markdown body as everything else. Exporting *to* Claude Code: an identity block, if present, SHOULD be composed into the body ahead of the bootstrap content per [Identity composition](#identity-composition), since Claude Code offers nowhere else to put it. Importing *from* Claude Code: there is no identity to extract; the whole body becomes `bootstrap` with no `identity` block. |
 | `model` (first entry) | `model` | Claude Code's `model` accepts a family alias (`sonnet`/`opus`/`haiku`), a full model ID, or `inherit`. This spec's ordered list has no equivalent of `inherit` (inherit the host's own model choice); exporting an `inherit`-configured subagent has no faithful representation and SHOULD be dropped or flagged rather than guessed. |
-| `model[].settings` | *(no equivalent)* | Claude Code's frontmatter does not expose model-specific reasoning/thinking parameters at the subagent-definition level; `effort` (see below) is Claude Code's own, different mechanism. |
+| `model[].settings` | `effort` | Claude Code's `effort` (a reasoning-effort-like dial) belongs in the relevant model entry's `settings` object on export, the same place this spec puts any other provider- or model-specific reasoning parameter (see [`model`](#model)), rather than in `extensions`. |
+| `limits.max_turns` | `maxTurns` | Direct mapping: both cap the number of turns the agent may take. |
+| `execution.background` | `background` | Direct mapping. |
+| `execution.isolation` | `isolation` | Partial mapping. Claude Code's documented value is `worktree` (a git-worktree-based isolation mechanism), which is not one of this spec's recommended `execution.isolation` vocabulary (`none`/`process`/`container`/`vm`) and has no cross-harness equivalent. Exporting *to* this spec, carry the Claude-Code-specific mechanism as `extensions["com.anthropic.claude-code"].isolation = "worktree"` rather than overloading `execution.isolation` with a value no other harness can act on; a generic `execution.isolation` value MAY still be set alongside it (e.g. `"process"`) as a best-effort cross-harness hint. |
 | `tools` (by reference) | `tools` (allowlist) | **Not a direct mapping.** Claude Code's `tools` names *built-in or MCP tool identifiers already available to the session*; it is a filter, not a by-reference installable tool list. This spec's `tools` are externally published, versioned, integrity-checkable references. Converting in either direction requires a resolution step this spec does not define: from Claude Code, each allowed tool name would need an external registry entry to become a reference; from this spec, each tool reference would need to resolve to a Claude Code tool name before it can appear in `tools`. |
 | `tools[].kind: "mcp_server"` | `mcpServers` | Claude Code's `mcpServers` can reference an already-configured server by name or supply an inline connection config; this spec's MCP tool references always use a locator (`id`/`url`), never an inline config, so an inline `mcpServers` entry has no direct equivalent without first publishing it somewhere resolvable. |
-| `permissions` | `permissionMode` | **Not a direct mapping.** `permissionMode` selects a *mode* (`default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`) governing how Claude Code's own approval system behaves; it does not declare filesystem/network/side-effect scopes the way this spec's `permissions` does. The two are related but not interchangeable; a faithful export would need a policy decision about which `permissionMode` best approximates a given `permissions` declaration, which this spec does not prescribe. |
+| `permissions` | *(no direct equivalent)* | Claude Code's `permissionMode` (see below) selects an approval-flow *mode*, not filesystem/network/side-effect scopes; it goes to `extensions`, not `permissions`. |
 | `contract` | *(no equivalent)* | Claude Code has no declared I/O JSON Schema contract for a subagent. |
 | `integrity` | *(no equivalent)* | Not applicable; Claude Code subagent files are local, version-controlled Markdown, not fetched-by-reference artifacts. |
 | *(no equivalent)* | `skills` (preload list) | Claude Code's `skills` frontmatter field *preloads* named skill content into context at startup; this is closer to inlining than to this spec's by-reference `skills`, and has no faithful round-trip without resolving each preloaded skill name to a published, referenceable skill. |
-| *(no equivalent)* | `maxTurns`, `autoCompactWindow`, `background`, `omitClaudeMd`, `isolation`, `color`, `initialPrompt`, `experimental.cacheTtl`, `effort`, `disallowedTools`, `hooks`, `memory` | Harness-specific runtime controls with no corresponding concept in this spec; these are expected to stay harness-local; an exporter MAY carry them inside `extensions` (e.g. `extensions["com.anthropic.claude-code"]`) rather than inventing new top-level fields. |
-
-**Could not verify:** whether Claude Code's frontmatter parser ignores
-arbitrary unrecognized field names in general (as opposed to the two
-specific named exceptions, `color` and `experimental`, which the fetched
-page states are "ignored rather than rejected" in one particular context —
-reuse as an agent-team teammate). This spec's own [extensibility
-rule](#extensibility) — harnesses MUST ignore unknown fields — is this
-spec's own requirement for conformance with this spec, independent of
-what Claude Code's parser does with arbitrary unknown frontmatter keys in
-general, which was not confirmed from the fetched page.
+| **extensions only** (`extensions["com.anthropic.claude-code"]`) | `disallowedTools`, `permissionMode`, `hooks`, `memory`, `color`, `autoCompactWindow`, `omitClaudeMd`, cache TTL (`experimental.cacheTtl`) | Harness-specific runtime controls with no corresponding concept in this spec: hooks execute commands with a harness-specific event model; `disallowedTools` is a harness-specific tool-name denylist (this spec's `permissions` covers refusal at the capability level, not by tool name); memory scope semantics diverge across harnesses; the rest (`permissionMode`, `color`, `autoCompactWindow`, `omitClaudeMd`, cache TTL) are Claude-Code-specific UI/runtime tuning. An exporter carries these inside `extensions` rather than inventing new top-level fields. |
 
 ## Appendix B: Mapping to/from Hermes Agent Profile Distributions (informative)
 
@@ -713,17 +868,32 @@ A Hermes profile distribution is a git repository that packages a complete
 Hermes agent for sharing and installation (`hermes profile install
 <repo>`). Source, verified by direct fetch on 2026-10-17:
 <https://hermes-agent.nousresearch.com/docs/user-guide/profile-distributions>.
+**Re-verified 2026-10-18 against the hermes-agent source at commit
+`0ab43d4f67e41be75f4f6c0fa14a86dbcfd3e5b3`**, specifically
+`hermes_cli/profile_distribution.py`, which this draft fetched directly and
+confirms: the manifest filename is `distribution.yaml`
+(`MANIFEST_FILENAME = "distribution.yaml"`), and the default
+distribution-owned paths are `SOUL.md`, `config.yaml`, `mcp.json`,
+`skills`, and `cron` (`DEFAULT_DIST_OWNED`), confirming the repository
+layout below at the source-code level, not just from documentation prose.
+The specific field names inside `config.yaml` and `mcp.json` below were
+verified as part of this spec's own gap-analysis (NOVA-Openclaw/specs#1)
+rather than independently re-derived from source in this draft; see
+`cli-config.yaml.example` in the same repository for the CLI's own
+(distinct, global) configuration format.
 
-Verified repository layout and manifest fields (per that page):
-`distribution.yaml` (manifest: `name` required; also `version`,
-`description`, `hermes_requires`, `author`, `license`, `env_requires`
-— each with `name`, `description`, `required`, `default` —, and
+Verified repository layout and manifest fields: `distribution.yaml`
+(manifest: `name` required; also `version`, `description`,
+`hermes_requires`, `author`, `license`, `env_requires` — each with
+`name`, `description`, `required`, `default` —, and
 `distribution_owned`), `SOUL.md` (identity/system-prompt text, no required
-internal schema, strongly recommended but not strictly required), `config.yaml`
-(model, provider, tool defaults), `mcp.json` (MCP server connections),
-`skills/` (bundled skill directories), and `cron/jobs.json` (scheduled jobs;
-distribution content). Versioning is via git tags/branches/commit SHAs, not
-a manifest version-range field.
+internal schema, strongly recommended but not strictly required),
+`config.yaml` (`model.default`, `model.provider`, `agent.max_turns`,
+`agent.reasoning_effort`, `mcp_servers`), `mcp.json` (a `$schema`
+pointing at the [agent-plugins.org](https://agent-plugins.org) MCP schema,
+plus `mcpServers`), `skills/` (bundled skill directories), and
+`cron/jobs.json` (scheduled jobs; distribution content). Versioning is via
+git tags/branches/commit SHAs, not a manifest version-range field.
 
 | Agent Definition | Hermes distribution | Notes |
 |---|---|---|
@@ -734,26 +904,17 @@ a manifest version-range field.
 | `metadata.license` | `distribution.yaml: license` | Direct mapping. |
 | `identity.persona` (+ `voice`, `values`, `pronouns`) | `SOUL.md` | Close conceptual mapping: Hermes explicitly separates `SOUL.md` (identity) from the rest of the distribution, the same identity/bootstrap separation this spec requires. `SOUL.md` has no internal schema (plain Markdown, scanned for prompt injection, used as-is), so `identity.persona` maps to `SOUL.md`'s content directly; this spec's additional structured sub-fields (`pronouns`, `voice`, `values`) have no dedicated Hermes equivalent and would need to be folded into `SOUL.md` prose on export. |
 | `bootstrap` | *(no single dedicated file)* | Hermes has no exact equivalent of one opaque bootstrap blob; domain/procedural context in a Hermes distribution is typically split across `config.yaml` tool defaults, bundled `skills/`, and whatever the author put in `SOUL.md` beyond pure identity. Importing *from* Hermes, a faithful `bootstrap` would need to be assembled from these non-identity parts; exporting *to* Hermes, `bootstrap` content has no single canonical destination file and would most naturally become part of `SOUL.md` (after `identity.persona`) or a project-level instructions file, which is a lossy, harness-specific choice this spec does not prescribe. |
-| `model` (first entry) | `config.yaml` (model, provider, reasoning) | Conceptually corresponds (Hermes's `config.yaml` carries model/provider/reasoning defaults per the repo layout the docs describe) but the page fetched for this appendix did not show `config.yaml`'s internal field names, so the exact key-level mapping (e.g. whether it supports an *ordered list* of fallbacks the way this spec's `model` array does) **could not be verified** from the source fetched. |
+| `model` (first entry: `provider`, `model`) | `config.yaml: model.provider`, `model.default` | Direct mapping for a single preferred model. Hermes's `config.yaml` does not document an *ordered list* of fallback models the way this spec's `model` array does; only the first (most-preferred) entry has an obvious Hermes destination, and additional entries have no verified Hermes equivalent. |
+| `model[].settings.reasoning_effort` | `config.yaml: agent.reasoning_effort` | Direct mapping: both are a reasoning-effort-style dial on the active model. |
+| `limits.max_turns` | `config.yaml: agent.max_turns` | Direct mapping. |
+| `schedules` | `cron/jobs.json` | Conceptual correspondence: both describe recurring, autonomously-triggered prompts. Hermes's per-job field names within `cron/jobs.json` were not independently re-verified at the source level for this draft; treat the `id`/`cron`/`prompt`/`enabled`/`timezone` shape as this spec's own design, not a confirmed field-for-field match. |
+| `environment` | `distribution.yaml: env_requires` | Close structural mapping: Hermes's `env_requires` entries (`name`, `description`, `required`, `default`) line up with this spec's `environment` entries (`name`, `description`, `required`, `secret`) for three of four fields. **One-way mapping caveat:** Hermes's `env_requires[].default` MAY carry a literal default *value* for the variable; this spec's `environment` entries MUST NOT carry a value at all (see [`environment`](#environment)). Importing `env_requires` into this spec's `environment`, any `default` value MUST be dropped, not carried over, to stay conformant. |
 | `skills` (by reference) | `skills/<name>/SKILL.md` | **Not a direct mapping.** Hermes bundles skill directories *inside* the distribution (shipped, versioned together with the agent via the same git repo/tags); this spec's `skills` are external references to independently published, independently versioned skills. Importing from Hermes would require publishing each bundled skill externally to get a referenceable `id`/`url`; exporting to Hermes would mean materializing each referenced skill's content into a `skills/` subdirectory, which is exactly the embedding this spec's `skills` are designed to avoid. |
-| `tools` (`kind: "mcp_server"`) | `mcp.json` | Conceptual correspondence (both describe MCP server connections for the agent) but `mcp.json`'s internal schema was not shown on the fetched page and **could not be verified**. |
-| `permissions` | *(no verified equivalent)* | Not confirmed from the fetched page; Hermes's security/sandboxing model, if any, was outside what was retrieved for this appendix. |
-| `contract` | *(no equivalent)* | Not found in the fetched documentation. |
+| `tools` (`kind: "mcp_server"`) | `mcp.json: mcpServers` | Direct conceptual mapping: both describe MCP server connections for the agent. Hermes's `mcp.json` declares a `$schema` pointing at the [agent-plugins.org](https://agent-plugins.org) MCP schema — a vendor-neutral format Hermes defers to rather than defining its own, which this spec's `tools` locator shape is compatible with in spirit (reference by id/url, not inline embedding) without being schema-identical to it. **Open, per this spec's originating issue thread:** full alignment between this spec's `tools` and the agent-plugins.org MCP schema should be checked before a 1.0 release of this spec. |
+| `permissions` | *(no verified equivalent)* | Hermes's security/sandboxing model, if any, was outside what was verified for this appendix. |
+| `contract` | *(no equivalent)* | Not found in the verified sources. |
 | `integrity` | *(no equivalent as a manifest field)* | Hermes relies on git's own content-addressing (commits, tags) rather than a declared hash field; not a direct field-for-field mapping. |
-| *(no equivalent)* | `hermes_requires` | A minimum Hermes version constraint; no equivalent concept in this spec, which is explicitly harness-agnostic rather than versioned against one harness. |
-| *(no equivalent)* | `env_requires` | Declares required/optional environment variables (e.g. API keys) an installer must supply; this spec's `tools`/`skills` references may implicitly require credentials to resolve, but this spec does not have a dedicated environment-variable-declaration field. |
-| *(no equivalent)* | `distribution_owned`, `cron/jobs.json` | Hermes-specific update-merge and scheduling mechanics with no corresponding concept in this spec. |
-
-**Could not verify:** the exact internal field names and schema of
-`config.yaml` (model/provider/reasoning configuration) and `mcp.json` (MCP
-server connection format) — the fetched documentation page described their
-*purpose* and their place in the repository layout, but did not render their
-field-level contents. A later revision of this appendix SHOULD fetch and
-cite the relevant Hermes configuration-reference pages directly (candidates
-seen in search results but not independently fetched/confirmed for this
-draft: `https://hermes-agent.nousresearch.com/docs/user-guide/configuring-models`
-and `https://hermes-agent.nousresearch.com/docs/user-guide/secrets/`) before
-asserting a field-level mapping for those two files.
+| **extensions only** (`extensions["com.nousresearch.hermes"]`) | `hermes_requires`, `distribution_owned`, compression/display/terminal settings | `hermes_requires` is a minimum-Hermes-version constraint with no equivalent in a harness-agnostic spec; `distribution_owned` is Hermes's own update-merge mechanic (which of a distribution's files survive `hermes profile update` unmodified); compression/display/terminal settings are Hermes CLI UI/runtime tuning (see `cli-config.yaml.example`, a separate, global CLI config file, not the per-distribution `config.yaml` mapped above). |
 
 ## References
 

@@ -114,5 +114,44 @@
     "algorithm": "sha256",
     "value": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
     "canonicalization": "JCS"
+  },
+  "limits": {
+    "max_turns": 40,
+    "timeout_seconds": 1800
+  },
+  "environment": [
+    {
+      "name": "EXAMPLE_LOG_API_TOKEN",
+      "description": "Bearer token for the logs.example.com API.",
+      "required": true,
+      "secret": true
+    },
+    {
+      "name": "EXAMPLE_INCIDENT_WEBHOOK_URL",
+      "description": "Optional webhook to notify when a status report is produced.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "initial_prompt": "Summarize the current status of incident INC-10452 and recommend next steps.",
+  "execution": {
+    "background": true,
+    "isolation": "container"
+  },
+  "schedules": [
+    {
+      "id": "daily-standup-report",
+      "cron": "0 13 * * 1-5",
+      "prompt": "Produce a status report for all open incidents and post it to the incident channel.",
+      "enabled": false,
+      "timezone": "UTC"
+    }
+  ],
+  "delegation": {
+    "when_to_use": "Delegate here for platform incident triage, log search, and status reporting. Do not delegate remediation actions to this agent; it only proposes them.",
+    "may_delegate_to": [
+      "Research",
+      "Communications"
+    ]
   }
 }
