@@ -282,6 +282,11 @@ and/or URL, never inlines its content. Each entry:
 A skill reference with neither `id` nor `url` is invalid: see
 [`examples/invalid/skill-missing-locator.agent.json`](examples/invalid/skill-missing-locator.agent.json).
 
+A skill reference's `url` MAY point at a `SKILL.md` file inside an
+[Agent Plugins](https://agent-plugins.org/) package (for example,
+`.../skills/<name>/SKILL.md` within a published plugin); see [Relationship
+to Agent Plugins](#relationship-to-agent-plugins-informative).
+
 ### `tools`
 
 Type: array of objects, 1 or more entries. OPTIONAL.
@@ -314,6 +319,14 @@ direct connection endpoint); this specification does not define MCP
 transport-level details (stdio/SSE/HTTP, launch arguments), which remain the
 Model Context Protocol's own concern and the harness's own responsibility to
 resolve from the reference.
+
+A `kind: "mcp_server"` tool reference's `url` MAY point at an
+[Agent Plugins](https://agent-plugins.org/) package's `mcp.json`, which can
+declare more than one server under its `mcpServers` map. When it does, this
+reference's `name` field MAY be used to select one entry from that map —
+the same `name` field this spec otherwise uses only as a human-readable
+label gets a second, specific use here. See [Relationship to Agent
+Plugins](#relationship-to-agent-plugins-informative).
 
 A tool reference with neither `id` nor `url`, or missing `required`, is
 invalid.
@@ -666,6 +679,13 @@ follows the shape of (each verified against its source before citing here):
   rule that harnesses MUST ignore namespaces they do not understand mirrors
   CloudEvents' treatment of extension attributes as optional, independently
   defined metadata.
+- **[Agent Plugins `extensions`](https://agent-plugins.org/schemas/1.0.0/)**
+  — a packaging spec for skills and MCP servers (see [Relationship to Agent
+  Plugins](#relationship-to-agent-plugins-informative)) whose own
+  `plugin.json` manifest carries an `extensions` property following the
+  same reverse-domain namespacing convention this specification recommends.
+  Cited here as prior art for the convention, not as a dependency of this
+  specification.
 
 See [`examples/valid/with-extensions.agent.json`](examples/valid/with-extensions.agent.json)
 for a definition carrying `extensions` at the top level and inside a
@@ -854,8 +874,7 @@ Claude Code ignores the field silently with no debug-log trace at all.
 | `limits.max_turns` | `maxTurns` | Direct mapping: both cap the number of turns the agent may take. |
 | `execution.background` | `background` | Direct mapping. |
 | `execution.isolation` | `isolation` | Partial mapping. Claude Code's documented value is `worktree` (a git-worktree-based isolation mechanism), which is not one of this spec's recommended `execution.isolation` vocabulary (`none`/`process`/`container`/`vm`) and has no cross-harness equivalent. Exporting *to* this spec, carry the Claude-Code-specific mechanism as `extensions["com.anthropic.claude-code"].isolation = "worktree"` rather than overloading `execution.isolation` with a value no other harness can act on; a generic `execution.isolation` value MAY still be set alongside it (e.g. `"process"`) as a best-effort cross-harness hint. |
-| `tools` (by reference) | `tools` (allowlist) | **Not a direct mapping.** Claude Code's `tools` names *built-in or MCP tool identifiers already available to the session*; it is a filter, not a by-reference installable tool list. This spec's `tools` are externally published, versioned, integrity-checkable references. Converting in either direction requires a resolution step this spec does not define: from Claude Code, each allowed tool name would need an external registry entry to become a reference; from this spec, each tool reference would need to resolve to a Claude Code tool name before it can appear in `tools`. |
-| `tools[].kind: "mcp_server"` | `mcpServers` | Claude Code's `mcpServers` can reference an already-configured server by name or supply an inline connection config; this spec's MCP tool references always use a locator (`id`/`url`), never an inline config, so an inline `mcpServers` entry has no direct equivalent without first publishing it somewhere resolvable. |
+| `tools` (by reference) | `tools` (allowlist) | **Not a direct mapping.** Claude Code's `tools` names *built-in or MCP tool identifiers already available to the session*; it is a filter, not a by-reference installable tool list. This spec's `tools` are externally published, versioned, integrity-checkable references. Converting in either direction requires a resolution step this spec does not define: from Claude Code, each allowed tool name would need an external registry entry to become a reference; from this spec, each tool reference would need to resolve to a Claude Code tool name before it can appear in `tools`. || `tools[].kind: "mcp_server"` | `mcpServers` | Claude Code's `mcpServers` can reference an already-configured server by name or supply an inline connection config; this spec's MCP tool references always use a locator (`id`/`url`), never an inline config, so an inline `mcpServers` entry has no direct equivalent without first publishing it somewhere resolvable. |
 | `permissions` | *(no direct equivalent)* | Claude Code's `permissionMode` (see below) selects an approval-flow *mode*, not filesystem/network/side-effect scopes; it goes to `extensions`, not `permissions`. |
 | `contract` | *(no equivalent)* | Claude Code has no declared I/O JSON Schema contract for a subagent. |
 | `integrity` | *(no equivalent)* | Not applicable; Claude Code subagent files are local, version-controlled Markdown, not fetched-by-reference artifacts. |
@@ -910,11 +929,49 @@ git tags/branches/commit SHAs, not a manifest version-range field.
 | `schedules` | `cron/jobs.json` | Conceptual correspondence: both describe recurring, autonomously-triggered prompts. Hermes's per-job field names within `cron/jobs.json` were not independently re-verified at the source level for this draft; treat the `id`/`cron`/`prompt`/`enabled`/`timezone` shape as this spec's own design, not a confirmed field-for-field match. |
 | `environment` | `distribution.yaml: env_requires` | Close structural mapping: Hermes's `env_requires` entries (`name`, `description`, `required`, `default`) line up with this spec's `environment` entries (`name`, `description`, `required`, `secret`) for three of four fields. **One-way mapping caveat:** Hermes's `env_requires[].default` MAY carry a literal default *value* for the variable; this spec's `environment` entries MUST NOT carry a value at all (see [`environment`](#environment)). Importing `env_requires` into this spec's `environment`, any `default` value MUST be dropped, not carried over, to stay conformant. |
 | `skills` (by reference) | `skills/<name>/SKILL.md` | **Not a direct mapping.** Hermes bundles skill directories *inside* the distribution (shipped, versioned together with the agent via the same git repo/tags); this spec's `skills` are external references to independently published, independently versioned skills. Importing from Hermes would require publishing each bundled skill externally to get a referenceable `id`/`url`; exporting to Hermes would mean materializing each referenced skill's content into a `skills/` subdirectory, which is exactly the embedding this spec's `skills` are designed to avoid. |
-| `tools` (`kind: "mcp_server"`) | `mcp.json: mcpServers` | Direct conceptual mapping: both describe MCP server connections for the agent. Hermes's `mcp.json` declares a `$schema` pointing at the [agent-plugins.org](https://agent-plugins.org) MCP schema — a vendor-neutral format Hermes defers to rather than defining its own, which this spec's `tools` locator shape is compatible with in spirit (reference by id/url, not inline embedding) without being schema-identical to it. **Open, per this spec's originating issue thread:** full alignment between this spec's `tools` and the agent-plugins.org MCP schema should be checked before a 1.0 release of this spec. |
+| `tools` (`kind: "mcp_server"`) | `mcp.json: mcpServers` | Direct conceptual mapping: both describe MCP server connections for the agent. Hermes's `mcp.json` declares a `$schema` pointing at the [agent-plugins.org](https://agent-plugins.org) MCP schema — a vendor-neutral format Hermes defers to rather than defining its own, which this spec's `tools` locator shape is compatible with in spirit (reference by id/url, not inline embedding) without being schema-identical to it. **Resolved:** Agent Plugins and this spec are complementary, not competing — see [Relationship to Agent Plugins](#relationship-to-agent-plugins-informative). |
 | `permissions` | *(no verified equivalent)* | Hermes's security/sandboxing model, if any, was outside what was verified for this appendix. |
 | `contract` | *(no equivalent)* | Not found in the verified sources. |
 | `integrity` | *(no equivalent as a manifest field)* | Hermes relies on git's own content-addressing (commits, tags) rather than a declared hash field; not a direct field-for-field mapping. |
 | **extensions only** (`extensions["com.nousresearch.hermes"]`) | `hermes_requires`, `distribution_owned`, compression/display/terminal settings | `hermes_requires` is a minimum-Hermes-version constraint with no equivalent in a harness-agnostic spec; `distribution_owned` is Hermes's own update-merge mechanic (which of a distribution's files survive `hermes profile update` unmodified); compression/display/terminal settings are Hermes CLI UI/runtime tuning (see `cli-config.yaml.example`, a separate, global CLI config file, not the per-distribution `config.yaml` mapped above). |
+
+## Relationship to Agent Plugins (informative)
+
+[Agent Plugins](https://agent-plugins.org/) (spec `1.0.0`, schemas at
+<https://agent-plugins.org/schemas/1.0.0/>) is a packaging and distribution
+format for skills and MCP servers; Hermes implements it (see [Appendix
+B](#appendix-b-mapping-tofrom-hermes-agent-profile-distributions-informative)).
+An Agent Plugins package's manifest, `plugin.json`, has exactly nine
+properties: `$schema`, `name`, `version`, `description`, `author`,
+`homepage`, `repository`, `license`, `keywords`, and `extensions`. There
+is no `model`, `prompt`, or `permissions` field — Agent Plugins defines no
+agent. A package instead bundles the things an agent might *use*: skills
+(`skills/<name>/SKILL.md`) and MCP servers (`mcp.json`).
+
+**This makes Agent Plugins and this specification complementary layers, not
+competing ones.** Agent Plugins packages and distributes components; an
+Agent Definition declares an agent — which model(s) it prefers, what it
+knows (`bootstrap`/`identity`/`initial_prompt`), and what it is and isn't
+allowed to do (`permissions`, `limits`, `environment`). An agent
+definition's `skills` and `tools` references are exactly where the two
+specs meet: see the reference-form notes under [`skills`](#skills) and
+[`tools`](#tools) above, and
+[`examples/valid/agent-plugins-refs.agent.json`](examples/valid/agent-plugins-refs.agent.json)
+for a definition that references a skill and an MCP server by pointing into
+a published Agent Plugins package.
+
+**Packaging note.** An Agent Plugins package MAY ship an Agent Definition
+file alongside its skills and MCP servers — for example, `<name>.agent.json`
+at the package root — so that a single published bundle supplies the agent
+itself plus the skills and MCP servers it depends on. This specification
+does not define a new extension namespace for this: it is a plain
+packaging and file-naming convention between two already-composable
+formats, not a schema feature either spec needs to encode.
+
+Both specs also converge on the same extensibility convention: Agent
+Plugins' own `plugin.json` carries an `extensions` property following the
+same reverse-domain namespacing this specification recommends for its own
+`extensions` object (see [Extensibility](#extensibility)).
 
 ## References
 
@@ -929,3 +986,4 @@ git tags/branches/commit SHAs, not a manifest version-range field.
 - [CloudEvents — Extension Context Attributes](https://github.com/cloudevents/spec/blob/main/cloudevents/extensions/README.md)
 - [Claude Code — Create custom subagents](https://code.claude.com/docs/en/sub-agents)
 - [Hermes Agent — Profile Distributions: Share a Whole Agent](https://hermes-agent.nousresearch.com/docs/user-guide/profile-distributions)
+- [Agent Plugins](https://agent-plugins.org/) (schemas at <https://agent-plugins.org/schemas/1.0.0/>) — packaging/distribution spec for skills and MCP servers; see [Relationship to Agent Plugins](#relationship-to-agent-plugins-informative)
