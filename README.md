@@ -28,6 +28,18 @@ this repository.
   `version`.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/).
 
+## Contributing and feedback
+
+Questions, ideas, and "I tried it" reports: use
+[Discussions](https://github.com/NOVA-Openclaw/specs/discussions). Concrete
+problems or proposals: open an
+[issue](https://github.com/NOVA-Openclaw/specs/issues). Implemented a spec
+in a harness or tool? Please file an
+[implementation report](https://github.com/NOVA-Openclaw/specs/issues/new?template=implementation-report.yml)
+so it can be listed on that spec's own README. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full guide, including how to
+propose a change and how spec versioning works here.
+
 ## Index
 
 | Directory | Spec | Status | Version | Notes |

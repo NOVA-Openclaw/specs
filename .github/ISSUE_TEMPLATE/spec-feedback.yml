@@ -1,0 +1,38 @@
+name: Spec feedback
+description: Report a problem or propose a change to a specific spec.
+title: "[spec-feedback] "
+labels: ["feedback"]
+body:
+  - type: dropdown
+    id: spec
+    attributes:
+      label: Which spec?
+      description: Select the spec this feedback is about.
+      options:
+        - Agent Definition (Agents/agent-definition)
+        - Nostr NIP-1791 (Nostr/NIP-1791.md)
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: section
+    attributes:
+      label: Section
+      description: Which section, field, or line does this concern? Link to it if you can.
+      placeholder: "e.g. #tools, or schema/agent-definition.schema.json line 42"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What's wrong, unclear, missing, or contradictory?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What would you change? A concrete wording, schema, or example change is ideal, but a rough idea is fine too.
+    validations:
+      required: false
