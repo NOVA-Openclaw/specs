@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions, ideas, and "I tried it" reports
+    url: https://github.com/NOVA-Openclaw/specs/discussions
+    about: Use Discussions for questions, design ideas, and experience reports that aren't a concrete bug or proposal yet.

@@ -1,0 +1,54 @@
+name: Implementation report
+description: Report a harness or tool that implements (or tried to implement) a spec from this repository.
+title: "Implementation: "
+labels: ["implementation"]
+body:
+  - type: input
+    id: harness
+    attributes:
+      label: Harness or tool name
+      description: Name of the harness, tool, or project implementing the spec.
+      placeholder: "e.g. OpenClaw, Claude Code, my-custom-runner"
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link
+      description: A URL to the project, repository, or relevant code.
+      placeholder: "https://github.com/org/repo"
+    validations:
+      required: true
+  - type: input
+    id: spec_version
+    attributes:
+      label: Spec version implemented
+      description: Which version of the spec does this implementation target?
+      placeholder: "e.g. 0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Import, export, or both?
+      description: Does this implementation read (import) definitions, write (export) them, or both?
+      options:
+        - Import
+        - Export
+        - Both
+    validations:
+      required: true
+  - type: textarea
+    id: hard_parts
+    attributes:
+      label: What was hard?
+      description: Which parts of the spec were difficult, ambiguous, or required guesswork to implement?
+    validations:
+      required: false
+  - type: textarea
+    id: missing_fields
+    attributes:
+      label: Fields missing or unclear
+      description: Any fields you needed but the spec doesn't define, or fields whose semantics were unclear in practice.
+    validations:
+      required: false

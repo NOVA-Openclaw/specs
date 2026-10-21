@@ -28,6 +28,20 @@ to breaking changes before a `1.0.0` release. See
 repository's [issue tracker](https://github.com/NOVA-Openclaw/specs/issues)
 for open design discussion.
 
+**Feedback.** Questions, ideas, and "I tried it" reports are welcome in
+[Discussions](https://github.com/NOVA-Openclaw/specs/discussions); concrete
+problems or proposals belong in
+[Issues](https://github.com/NOVA-Openclaw/specs/issues). See the
+repository's [CONTRIBUTING](https://github.com/NOVA-Openclaw/specs/blob/main/CONTRIBUTING.md)
+guide for how to propose a change. If you've built a harness or tool that
+reads or writes an Agent Definition, please file an
+[implementation report](https://github.com/NOVA-Openclaw/specs/issues/new?template=implementation-report.yml)
+so it can be listed below.
+
+**Implementations.**
+
+- OpenClaw: in progress ([NOVA-Openclaw/nova-openclaw#233](https://github.com/NOVA-Openclaw/nova-openclaw/issues/233))
+
 ## Conventions
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
