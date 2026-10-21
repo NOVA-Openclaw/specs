@@ -1,0 +1,20 @@
+{
+  "spec_version": "0.1.0",
+  "metadata": {
+    "role": "Utility"
+  },
+  "bootstrap": "Use the referenced skill and tool to search the web and produce a one-paragraph summary of findings. Do not add commentary beyond the summary.",
+  "skills": [
+    {
+      "id": "registry.example.com/skills/summarization",
+      "version_range": "^1.2.0"
+    }
+  ],
+  "tools": [
+    {
+      "id": "registry.example.com/tools/web-search",
+      "version": "1.0.0",
+      "required": true
+    }
+  ]
+}

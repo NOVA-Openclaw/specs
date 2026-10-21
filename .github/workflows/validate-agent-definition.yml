@@ -1,0 +1,46 @@
+name: Validate Agent Definition examples
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Agents/agent-definition/**"
+      - ".github/workflows/validate-agent-definition.yml"
+  pull_request:
+    paths:
+      - "Agents/agent-definition/**"
+      - ".github/workflows/validate-agent-definition.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install jsonschema (pinned)
+        run: pip install jsonschema==4.10.3
+
+      - name: Validate every example against the schema
+        run: python3 Agents/agent-definition/validate.py
+
+      - name: Guard anyOf (not oneOf) for the name/role rule
+        run: python3 Agents/agent-definition/test_anyof_vs_oneof.py
+
+      - name: Guard against a vacuous pass when examples are missing
+        run: |
+          set -e
+          TMPDIR="$(mktemp -d)"
+          cp Agents/agent-definition/validate.py "$TMPDIR/"
+          cp -r Agents/agent-definition/schema "$TMPDIR/"
+          cd "$TMPDIR"
+          if python3 validate.py; then
+            echo "FAIL: validate.py exited 0 with zero example files present." >&2
+            echo "A moved or emptied examples/ directory must not make this check pass." >&2
+            exit 1
+          else
+            echo "OK: validate.py correctly exited non-zero with zero example files present."
+          fi

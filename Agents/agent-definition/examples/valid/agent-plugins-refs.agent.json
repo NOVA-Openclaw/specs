@@ -1,0 +1,21 @@
+{
+  "spec_version": "0.1.0",
+  "metadata": {
+    "role": "Utility"
+  },
+  "bootstrap": "Use the plugin-packaged summarization skill and the plugin's filesystem MCP server to read and summarize local files.",
+  "skills": [
+    {
+      "url": "https://registry.example.com/plugins/example-toolkit/skills/summarization/SKILL.md",
+      "version": "1.0.0"
+    }
+  ],
+  "tools": [
+    {
+      "kind": "mcp_server",
+      "url": "https://registry.example.com/plugins/example-toolkit/mcp.json",
+      "name": "filesystem",
+      "required": true
+    }
+  ]
+}

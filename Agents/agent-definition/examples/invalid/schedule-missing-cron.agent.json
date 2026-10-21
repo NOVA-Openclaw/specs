@@ -1,0 +1,13 @@
+{
+  "spec_version": "0.1.0",
+  "metadata": {
+    "role": "Utility"
+  },
+  "bootstrap": "This document is otherwise well-formed but its schedules entry omits the required cron field. FAILS: a schedules entry MUST carry id, cron, and prompt.",
+  "schedules": [
+    {
+      "id": "daily-report",
+      "prompt": "Produce a daily status report."
+    }
+  ]
+}

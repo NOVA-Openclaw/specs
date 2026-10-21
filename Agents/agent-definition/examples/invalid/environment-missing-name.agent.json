@@ -1,0 +1,14 @@
+{
+  "spec_version": "0.1.0",
+  "metadata": {
+    "role": "Utility"
+  },
+  "bootstrap": "This document is otherwise well-formed but its environment entry omits the required name field. FAILS: an environment entry MUST carry name.",
+  "environment": [
+    {
+      "description": "An API token this agent needs, but with no variable name given.",
+      "required": true,
+      "secret": true
+    }
+  ]
+}

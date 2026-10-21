@@ -1,0 +1,602 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NOVA-Openclaw/specs/Agents/agent-definition/schema/agent-definition.schema.json",
+  "title": "Agent Definition",
+  "description": "A platform-agnostic, harness-agnostic JSON document from which an agent harness can configure a functional subagent. See Agents/agent-definition/README.md for the normative prose specification. Vendor- or implementation-specific data belongs in the spec-defined `extensions` object, not in invented top-level fields.",
+  "type": "object",
+  "required": [
+    "spec_version"
+  ],
+  "properties": {
+    "spec_version": {
+      "description": "The version of the Agent Definition specification that this document conforms to, as SemVer 2.0.0.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z-.]+)?(\\+[0-9A-Za-z-.]+)?$"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "model": {
+      "description": "An ordered list of model preferences, most preferred first. A harness MUST attempt entries in order and use the first it can satisfy, or map it to its nearest equivalent and report the substitution.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/modelPreference"
+      }
+    },
+    "bootstrap": {
+      "description": "A single text blob of bootstrap context for the agent (role, domain knowledge, procedures, rules). The spec defines no internal structure for this text; a harness MUST treat it as opaque, untrusted natural-language content.",
+      "type": "string",
+      "minLength": 1
+    },
+    "identity": {
+      "$ref": "#/$defs/identity"
+    },
+    "skills": {
+      "description": "References to published, maintained skills the agent may use. Never embedded.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/skillReference"
+      }
+    },
+    "tools": {
+      "description": "References to published, maintained tools (including MCP servers) the agent may use. Never embedded.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/toolReference"
+      }
+    },
+    "permissions": {
+      "$ref": "#/$defs/permissions"
+    },
+    "contract": {
+      "$ref": "#/$defs/contract"
+    },
+    "integrity": {
+      "$ref": "#/$defs/integrity"
+    },
+    "extensions": {
+      "$ref": "#/$defs/extensions"
+    },
+    "limits": {
+      "$ref": "#/$defs/limits"
+    },
+    "environment": {
+      "description": "A list of environment variables the agent needs the harness to resolve. Never carries actual values; see the environmentEntry definition and Processing Rules.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/environmentEntry"
+      }
+    },
+    "initial_prompt": {
+      "description": "A single text blob auto-submitted to the agent as its first user turn, distinct from bootstrap (which configures the agent, but is not itself a turn in the conversation).",
+      "type": "string",
+      "minLength": 1
+    },
+    "execution": {
+      "$ref": "#/$defs/execution"
+    },
+    "schedules": {
+      "description": "A list of recurring schedules on which the agent should run a prompt autonomously.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/scheduleEntry"
+      }
+    },
+    "delegation": {
+      "$ref": "#/$defs/delegation"
+    }
+  },
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "description": "Validity rule 1 (inclusive anyOf, NOT oneOf): at least one of metadata.name or metadata.role MUST be present. Both MAY be present.",
+      "anyOf": [
+        {
+          "required": [
+            "metadata"
+          ],
+          "properties": {
+            "metadata": {
+              "required": [
+                "name"
+              ]
+            }
+          }
+        },
+        {
+          "required": [
+            "metadata"
+          ],
+          "properties": {
+            "metadata": {
+              "required": [
+                "role"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "Validity rule 2 (inclusive anyOf, NOT oneOf): at least one substantive field MUST be present. Any combination of these fields MAY be present.",
+      "anyOf": [
+        {
+          "required": [
+            "bootstrap"
+          ]
+        },
+        {
+          "required": [
+            "identity"
+          ]
+        },
+        {
+          "required": [
+            "skills"
+          ]
+        },
+        {
+          "required": [
+            "tools"
+          ]
+        },
+        {
+          "required": [
+            "model"
+          ]
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "description": "Descriptive information about this agent definition. At least one of name or role is REQUIRED (enforced at the document level, not here, so that this sub-schema stays reusable).",
+      "properties": {
+        "id": {
+          "description": "An opaque, globally-unique identifier for this agent definition (e.g. a reverse-DNS string or UUID). Distinct from identity; this identifies the DOCUMENT, not a persona.",
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "description": "The agent's display/invocation name (e.g. \"Scout\"). SHOULD be present when identity is present.",
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "description": "A human-readable description of what the agent does (e.g. \"Research\", \"Quality Assurance\"), used by harnesses to derive a fallback handle when name is absent.",
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "description": "The version of this particular agent definition (not of the spec), as SemVer.",
+          "type": "string"
+        },
+        "description": {
+          "description": "A longer, free-text description of the agent for humans browsing a registry or catalog.",
+          "type": "string"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "license": {
+          "description": "An SPDX license identifier for this agent definition document.",
+          "type": "string"
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": true
+    },
+    "modelPreference": {
+      "type": "object",
+      "description": "One entry in the ordered model preference list. provider and model are the core sub-fields and are REQUIRED. settings is a free-form object whose keys and values are that provider's OWN parameter names (e.g. Anthropic's thinking object, OpenAI's reasoning_effort, Google's thinkingConfig). The spec defines no global reasoning/thinking vocabulary.",
+      "required": [
+        "provider",
+        "model"
+      ],
+      "properties": {
+        "provider": {
+          "description": "An identifier for the model provider (e.g. \"anthropic\", \"openai\", \"google\"). Not constrained to an enum so new providers need no spec change.",
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "description": "The provider's own model identifier string (e.g. \"claude-sonnet-4-5\", \"gpt-5\").",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "description": "An optional human-readable label for this preference entry.",
+          "type": "string"
+        },
+        "settings": {
+          "description": "Provider- and model-specific parameters, using that provider's own parameter names and value shapes (e.g. reasoning/thinking effort or budget). Opaque to this spec.",
+          "type": "object"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": true
+    },
+    "identity": {
+      "type": "object",
+      "description": "WHO the agent is: name, persona, voice, values, pronouns. Composed before bootstrap. Separate from bootstrap so a harness with its own identity can use, replace, or ignore it per a declared policy.",
+      "required": [
+        "persona"
+      ],
+      "properties": {
+        "persona": {
+          "description": "The core identity text: who the agent is, in the agent's own voice or a description of it. Core sub-field; REQUIRED whenever identity is present.",
+          "type": "string",
+          "minLength": 1
+        },
+        "pronouns": {
+          "type": "string"
+        },
+        "voice": {
+          "description": "Free-text description of tone, register, and speaking style.",
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": true
+    },
+    "locator": {
+      "description": "Shared locator shape for skill and tool references: a registry id or a URL (or both), optionally pinned to a version or version range, optionally integrity-checked.",
+      "type": "object",
+      "anyOf": [
+        {
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "required": [
+            "url"
+          ]
+        }
+      ],
+      "properties": {
+        "id": {
+          "description": "A registry identifier for the referenced skill, tool, or MCP server.",
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "description": "A URL locating the referenced skill, tool, or MCP server (e.g. its manifest, package, or connection endpoint).",
+          "type": "string",
+          "format": "uri"
+        },
+        "version": {
+          "description": "An exact version of the referenced skill or tool.",
+          "type": "string"
+        },
+        "version_range": {
+          "description": "A version range/constraint for the referenced skill or tool (e.g. \"^1.2.0\", \"~3.1\"), in whatever range syntax the registry uses.",
+          "type": "string"
+        },
+        "integrity": {
+          "$ref": "#/$defs/integrity"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "skillReference": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/locator"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "An optional human-readable label for this skill reference."
+            }
+          }
+        }
+      ]
+    },
+    "toolReference": {
+      "description": "A reference to a tool or an MCP server. required marks whether the agent needs this tool to function: if a harness cannot satisfy a reference with required = true, it MUST refuse to instantiate the agent rather than run a degraded agent.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/locator"
+        },
+        {
+          "type": "object",
+          "required": [
+            "required"
+          ],
+          "properties": {
+            "required": {
+              "description": "Whether this tool is required for the agent to function. If true and the harness cannot satisfy it, the harness MUST refuse to instantiate the agent.",
+              "type": "boolean"
+            },
+            "kind": {
+              "description": "The kind of reference. \"mcp_server\" indicates the locator points at an MCP server (by registry id or connection URL) rather than a single tool.",
+              "type": "string",
+              "enum": [
+                "tool",
+                "mcp_server"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "description": "An optional human-readable label for this tool reference."
+            }
+          }
+        }
+      ]
+    },
+    "permissions": {
+      "type": "object",
+      "description": "Declared operating limits for the agent. The harness MUST enforce what it can and MUST report what it cannot enforce. At least one sub-field is REQUIRED once this block is present.",
+      "minProperties": 1,
+      "properties": {
+        "filesystem": {
+          "type": "object",
+          "properties": {
+            "read": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "write": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "network": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "allowed_hosts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "side_effects": {
+          "description": "A declared list of side-effect classes this agent may perform (e.g. \"sends_notifications\", \"spends_funds\"). Free-form strings; the spec defines no global enum.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": true
+    },
+    "contract": {
+      "type": "object",
+      "description": "An I/O contract for the agent, expressed as JSON Schemas. At least one of input or output is REQUIRED once this block is present.",
+      "anyOf": [
+        {
+          "required": [
+            "input"
+          ]
+        },
+        {
+          "required": [
+            "output"
+          ]
+        }
+      ],
+      "properties": {
+        "input": {
+          "description": "A JSON Schema describing the agent's expected input.",
+          "type": "object"
+        },
+        "output": {
+          "description": "A JSON Schema describing the agent's produced output.",
+          "type": "object"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": true
+    },
+    "integrity": {
+      "type": "object",
+      "description": "A content hash over this document (or the referenced artifact), computed over the JSON canonicalized per RFC 8785 (JCS). algorithm and value are the core sub-fields and are REQUIRED once this block is present.",
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "description": "The hash algorithm used (e.g. \"sha256\", \"sha512\").",
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "description": "The hash digest, hex- or base64-encoded.",
+          "type": "string",
+          "minLength": 1
+        },
+        "canonicalization": {
+          "description": "The canonicalization scheme the hash was computed over. This spec defines RFC 8785 (JCS) as the canonicalization scheme for agent definitions.",
+          "type": "string",
+          "const": "JCS"
+        }
+      },
+      "additionalProperties": true
+    },
+    "extensions": {
+      "type": "object",
+      "description": "A free-form, spec-defined extension point for vendor- or implementation-specific data that does not require a spec update. Keys SHOULD be namespaced (reverse-DNS or a short vendor prefix, e.g. \"org.example.harness\") to avoid collisions. Values MAY be any JSON. A harness MUST ignore namespaces it does not understand and MUST NOT refuse to instantiate because of unknown extension content. A harness SHOULD preserve this object unchanged when it re-exports or transforms a definition. Extensions MUST NOT override the meaning of any spec-defined field."
+    },
+    "limits": {
+      "type": "object",
+      "description": "Declared resource limits for the agent. At least one sub-field is REQUIRED once this block is present.",
+      "minProperties": 1,
+      "properties": {
+        "max_turns": {
+          "description": "The maximum number of conversational turns the agent may take before the harness stops it.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "description": "The maximum wall-clock time, in seconds, the agent may run before the harness stops it.",
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "environmentEntry": {
+      "type": "object",
+      "description": "A declared environment variable the agent needs resolved by the harness. name is the core sub-field and is REQUIRED. This entry declares the variable's NAME and requirements only; it MUST NOT carry the variable's actual value.",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "description": "The environment variable's name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "description": "A human-readable description of what this variable is for."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the harness MUST be able to resolve this variable for the agent to be instantiated. Defaults to true when absent."
+        },
+        "secret": {
+          "type": "boolean",
+          "description": "Whether this variable's value should be treated as a secret (e.g. masked in logs). Defaults to false when absent."
+        }
+      },
+      "not": {
+        "required": [
+          "value"
+        ]
+      },
+      "additionalProperties": true
+    },
+    "execution": {
+      "type": "object",
+      "description": "Declared execution characteristics for the agent. At least one sub-field is REQUIRED once this block is present.",
+      "minProperties": 1,
+      "properties": {
+        "background": {
+          "type": "boolean",
+          "description": "Whether the agent is intended to run as a background task rather than an interactive, foreground session."
+        },
+        "isolation": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The isolation level the agent expects to run under. Recommended values: \"none\", \"process\", \"container\", \"vm\". This is an open vocabulary, not a closed enum: a harness MAY encounter a value it does not recognize and MUST report it rather than rejecting the definition because of it."
+        }
+      },
+      "additionalProperties": true
+    },
+    "scheduleEntry": {
+      "type": "object",
+      "description": "A declared recurring schedule on which the agent should run a prompt autonomously. id, cron, and prompt are the core sub-fields and are REQUIRED.",
+      "required": [
+        "id",
+        "cron",
+        "prompt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A stable identifier for this schedule entry, unique within the definition."
+        },
+        "cron": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A cron expression describing when this schedule fires."
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The prompt to submit to the agent when this schedule fires."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this schedule is enabled. A harness SHOULD require explicit operator approval before enabling a schedule imported from a definition; see Security Considerations."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "The IANA time zone name the cron expression is evaluated in (e.g. \"UTC\", \"America/New_York\")."
+        }
+      },
+      "additionalProperties": true
+    },
+    "delegation": {
+      "type": "object",
+      "description": "Guidance for an orchestrator deciding whether, and to whom, to delegate. At least one sub-field is REQUIRED once this block is present.",
+      "minProperties": 1,
+      "properties": {
+        "when_to_use": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Guidance for an orchestrator deciding whether to delegate to this agent. Distinct from metadata.description, which is a general description rather than delegation-routing guidance."
+        },
+        "may_delegate_to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Names or roles of agents this agent may itself delegate to."
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "spec_version": "0.1.0",
+  "metadata": {
+    "description": "A metadata block that describes the agent but supplies neither a name nor a role."
+  },
+  "bootstrap": "This document has a substantive field (bootstrap) but metadata has neither name nor role. FAILS: at least one of metadata.name or metadata.role is REQUIRED."
+}

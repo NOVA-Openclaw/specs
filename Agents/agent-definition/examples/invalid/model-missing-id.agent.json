@@ -1,0 +1,17 @@
+{
+  "spec_version": "0.1.0",
+  "metadata": {
+    "role": "Research"
+  },
+  "model": [
+    {
+      "provider": "anthropic",
+      "settings": {
+        "thinking": {
+          "type": "enabled",
+          "budget_tokens": 8000
+        }
+      }
+    }
+  ]
+}

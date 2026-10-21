@@ -1,0 +1,12 @@
+{
+  "spec_version": "0.1.0",
+  "metadata": {
+    "role": "Utility"
+  },
+  "bootstrap": "Minimal bootstrap for a tools/skills-oriented agent.",
+  "skills": [
+    {
+      "version": "1.0.0"
+    }
+  ]
+}
